@@ -15,6 +15,11 @@ int buttonVal;
 int buzzPin = 8;
 int xVal;
 int yVal;
+int contarPosicion = 16;
+int randomByte = 0;//caja por defecto es la 0 la de inicio
+int velocidad = 500; //velocidad inicial por defecto
+int puntuacion = 0; // Inicializamos la variable puntuacion a 0
+unsigned long tiempo; // Variable para guardar el tiempo de inicio
 
 //variable global para saber si ha pulsado el boton, si es 0 no ha pulsado, si es 1 o mas pasa para dentro
 bool jugadorListo = false;
@@ -25,6 +30,85 @@ bool mensajeBienvenida = false;
 //llamamos a la funcion de la libreria, y asignamos los pines que tenemos conectados
 LiquidCrystal lcd(rs, e, d4, d5, d6, d7);
 
+
+//dibujamos las animaciones de los obstaculos
+byte caja0[] = {
+  B00000,
+  B00000,
+  B00000,
+  B11111,
+  B11011,
+  B10101,
+  B11011,
+  B11111
+};
+
+byte caja1[] = {
+  B11111,
+  B11011,
+  B10101,
+  B11011,
+  B10101,
+  B11011,
+  B10101,
+  B11111
+};
+
+byte caja2[] = {
+  B00000,
+  B00000,
+  B11111,
+  B11011,
+  B11111,
+  B11111,
+  B11011,
+  B11111
+};
+//dibujamos las distintas animaciones de los personajes:
+byte andar[] = {
+  B01000,
+  B11111,
+  B11111,
+  B01100,
+  B01111,
+  B01100,
+  B01100,
+  B10100
+};
+
+byte saltar[] = {
+  B01000,
+  B11111,
+  B11111,
+  B01100,
+  B11110,
+  B01000,
+  B10100,
+  B00000
+};
+
+byte agacharse[] = {
+  B00000,
+  B00000,
+  B01000,
+  B11111,
+  B11111,
+  B01100,
+  B11110,
+  B01100
+};
+
+byte puntos[] = {
+  B01010,
+  B00100,
+  B10101,
+  B01110,
+  B10101,
+  B00100,
+  B01010,
+  B00000
+};
+//-- fin de las animaciones --
 
 
 void setup() {
@@ -44,6 +128,16 @@ void setup() {
 
   Serial.begin(9600);
 
+  //generamos los obstaculos, llamandolos
+  lcd.createChar(0, caja0);
+  lcd.createChar(1, caja1);
+  lcd.createChar(2, caja2);
+  lcd.createChar(3, andar);
+  lcd.createChar(4, saltar);
+  lcd.createChar(5, agacharse);
+  lcd.createChar(6, puntos);
+  // Guardamos el tiempo de inicio
+  tiempo = millis();
 }
 
 void loop() {
@@ -76,7 +170,7 @@ void loop() {
       lcd.print("Estas dentro!");
       lcd.setCursor(0,1);
       lcd.print(" Empezamos...");
-      delay(3000);
+      delay(1500);
       lcd.clear();
 
       mensajeBienvenida = true;
@@ -98,34 +192,78 @@ void loop() {
     }else{
       digitalWrite(buzzPin, 0); 
     }
+    // Medimos el tiempo que ha pasado y actualizamos la puntuación
+      unsigned long tiempoActual = millis();
+      unsigned long tiempoTranscurrido = tiempoActual - tiempo;
+      puntuacion = tiempoTranscurrido / 1000; // Cada 1000 ms suma 1 punto
+
+    //vamos pintando la puntuación obtenida:
+      if(puntuacion < 10){ //si tiene menos de 2 dígitos
+        lcd.setCursor(14, 0);//posición donde me pinta la moneda
+        lcd.write(byte(6)); //me pinta la moneda, un cuadradito a la izquierda siempre de la puntuación
+        lcd.setCursor(15, 0);//posicion donde me muestra la puntuación
+        lcd.print(puntuacion);//que variable es la que me imprime, en este caso donde se guarda la puntuación
+      }else if(puntuacion < 100){   //si tiene menos de 3 dígitos
+        lcd.setCursor(13, 0);
+        lcd.write(byte(6));
+        lcd.setCursor(14, 0);
+        lcd.print(puntuacion);
+      }else if(puntuacion < 1000){//si tiene menos de 4 dígitos
+        lcd.setCursor(12, 0);
+        lcd.write(byte(6));
+        lcd.setCursor(13, 0);
+        lcd.print(puntuacion);
+      }else if(puntuacion < 10000){//si tiene menos de 5 dígitos
+        lcd.setCursor(11, 0);
+        lcd.write(byte(6));
+        lcd.setCursor(12, 0);
+        lcd.print(puntuacion);
+      }
+      
+    //generamos la caja
+    if(contarPosicion >=0){
+      lcd.setCursor(contarPosicion, 1);//vamos pintado la resta de la posicion de la caja
+      lcd.write(byte(randomByte));//generamos una caja aleatoria, se establece aleatoriamente abajo, por defecto es la 0
+      delay(velocidad);//va a la velocidad que se ha establecido aleatoriamente más abajo, por defecto es 500
+      lcd.clear();
+      contarPosicion--;
+    }else{
+      contarPosicion = 16; //vuelve a generar la posicion inicial
+      randomByte = random(3); //una vez llega al final la caja coge aleatoriamente otro tipo
+      velocidad = random(500 - 100) + 100; //variamos la velocidad cuando llega al final
+    }
 
     //controlamos los movimientos
 
     if(yVal < 500){
-      lcd.setCursor(0,1);
-      lcd.print("Saltar");
+      // Pintamos al muñeco saltando
+      lcd.setCursor(0, 0);
+      lcd.write(byte(4));
       delay(100);
       lcd.clear();
     } else if(yVal > 510){
-      lcd.setCursor(0,1);
-      lcd.print("Agacharse");
+      // Pintamos al muñeco agachado
+      lcd.setCursor(0, 1);
+      lcd.write(byte(5));
       delay(100);
       lcd.clear();
-    } else if(xVal < 500){
+    } else if(xVal < 500){//moverse hacia atras
       lcd.setCursor(0,1);
       lcd.print("Atras");
       delay(100);
       lcd.clear();
-    } else if(xVal > 510){
+    } else if(xVal > 510){//moverse hacia adelante
       lcd.setCursor(0,1);
       lcd.print("Adelante");
       delay(100);
       lcd.clear();
     }else{
-      lcd.setCursor(0,1);
-      lcd.print("Andando...");
+      // Pintamos al muñeco antando
+      lcd.setCursor(0, 1);
+      lcd.write(byte(3));
       delay(100);
       lcd.clear();
+
     }
 
   }
