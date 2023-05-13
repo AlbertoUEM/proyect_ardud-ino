@@ -20,12 +20,18 @@ int randomByte = 0;//caja por defecto es la 0 la de inicio
 int velocidad = 500; //velocidad inicial por defecto
 int puntuacion = 0; // Inicializamos la variable puntuacion a 0
 unsigned long tiempo; // Variable para guardar el tiempo de inicio
+int posicionPersonajeX = 0;
+int posicionPersonajeY = 0;
 
 //variable global para saber si ha pulsado el boton, si es 0 no ha pulsado, si es 1 o mas pasa para dentro
 bool jugadorListo = false;
 
 //variable para que no me imprima todo el rato el mensaje de "estas dentro Empezamos..."
 bool mensajeBienvenida = false;
+
+// Música de fin del juego
+int notas[] = {262, 294, 330, 349, 392, 440, 494, 523};
+int duracion[] = {200, 200, 200, 200, 200, 200, 200, 400};
 
 //llamamos a la funcion de la libreria, y asignamos los pines que tenemos conectados
 LiquidCrystal lcd(rs, e, d4, d5, d6, d7);
@@ -170,10 +176,12 @@ void loop() {
       lcd.print("Estas dentro!");
       lcd.setCursor(0,1);
       lcd.print(" Empezamos...");
+      musicaInicio(); //llamamos al metodo para que haga sonar la música de inicio
       delay(1500);
       lcd.clear();
 
       mensajeBienvenida = true;
+      puntuacion = 0;
     }
     // guardamos los valores que recoja el joystick
     xVal = analogRead(xPin);
@@ -233,7 +241,7 @@ void loop() {
       velocidad = random(500 - 100) + 100; //variamos la velocidad cuando llega al final
     }
 
-    //controlamos los movimientos
+    //controlamos los movimientos y vamos actualizando las posiciones de los personajes
 
     if(yVal < 500){
       // Pintamos al muñeco saltando
@@ -241,6 +249,10 @@ void loop() {
       lcd.write(byte(4));
       delay(100);
       lcd.clear();
+      posicionPersonajeX = 1;
+      //trazas para saber la posicion del jugador
+      //lcd.setCursor(0, 0);
+      //lcd.print(posicionPersonajeX);
     } else if(yVal > 510){
       // Pintamos al muñeco agachado
       lcd.setCursor(0, 1);
@@ -263,9 +275,51 @@ void loop() {
       lcd.write(byte(3));
       delay(100);
       lcd.clear();
+      posicionPersonajeX = 0;
+      //trazas para saber la posicion del jugador
+      //lcd.setCursor(0, 0);
+      //lcd.print(posicionPersonajeX);
 
+        //comprobamos si la posicion del personaje es la misma que la caja, de ser asi se terminaria el juego
+        if (contarPosicion == posicionPersonajeX){
+          // terminamos el juego
+          //limpiarmos la pantalla entera para mostrar el mensaje final
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print(" Fin del Juego");
+        lcd.setCursor(0,1);
+        lcd.print("Puntos: ");
+        lcd.print(puntuacion);//imprimimos la puntuación
+        musicaFin();//llamamos al metodo para que haga sonar la música de fin
+        delay(4000);//esperamos 4 segundos y reseteamos todas las variables de inicio
+        jugadorListo = false;
+        velocidad = 500;
+        puntuacion == 0;
+        tiempo = millis();
+        lcd.clear();
+        }
     }
+    
 
   }
 
 }
+
+void musicaInicio() {
+  for (int i = 0; i < 8; i++) {
+    tone(8, notas[i], duracion[i]);
+    delay(100);
+  }
+}
+
+void musicaFin() {
+    for (int i = 0; i < 8; i++) {
+          tone(buzzPin, notas[i], duracion[i]);
+          delay(duracion[i] * 1.30);
+          noTone(buzzPin);
+          delay(50);
+    }
+  
+}
+
+  
