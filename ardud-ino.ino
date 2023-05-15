@@ -1,4 +1,5 @@
 #include <LiquidCrystal.h> //incluimos la libreria para que funcione el lcd
+#include <EEPROM.h> //incluimos la libreria de la memoria eprom para poder guardar y leer datos en local del chip
 
 //pines que estamos utilizando de nuestra pantalla, las conexiones
 int rs = 12;
@@ -22,6 +23,7 @@ int puntuacion = 0; // Inicializamos la variable puntuacion a 0
 unsigned long tiempo; // Variable para guardar el tiempo de inicio
 int posicionPersonajeX = 0;
 int posicionPersonajeY = 0;
+int puntuacionGuardada;
 
 //variable global para saber si ha pulsado el boton, si es 0 no ha pulsado, si es 1 o mas pasa para dentro
 bool jugadorListo = false;
@@ -133,6 +135,7 @@ void setup() {
   pinMode(buzzPin,OUTPUT);
 
   Serial.begin(9600);
+  //EEPROM.write(0,25);
 
   //generamos los obstaculos, llamandolos
   lcd.createChar(0, caja0);
@@ -154,12 +157,22 @@ void loop() {
   }
 
   if(!jugadorListo) {
+
+    puntuacionGuardada = EEPROM.read(0); //leemos el valor almacenado en la dirección de memoria 0
+
   // decimos donde vamos a empezar a escribir en la pantalla, la coordenada
     lcd.setCursor(0,0);
     lcd.print("   Bienvenido");
     lcd.setCursor(0,1);
     lcd.print("    Jugador 1");
     delay(1000);
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Puntuacion mas");
+    lcd.setCursor(0,1);
+    lcd.print("alta: ");
+    lcd.print(puntuacionGuardada);
+    delay(2000);
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Presiona para");
@@ -203,7 +216,7 @@ void loop() {
     // Medimos el tiempo que ha pasado y actualizamos la puntuación
       unsigned long tiempoActual = millis();
       unsigned long tiempoTranscurrido = tiempoActual - tiempo;
-      puntuacion = tiempoTranscurrido / 1000; // Cada 1000 ms suma 1 punto
+      puntuacion = tiempoTranscurrido / 500; // Cada 1000 ms suma 1 punto
 
     //vamos pintando la puntuación obtenida:
       if(puntuacion < 10){ //si tiene menos de 2 dígitos
@@ -259,6 +272,31 @@ void loop() {
       lcd.write(byte(5));
       delay(100);
       lcd.clear();
+       posicionPersonajeX = 0;
+      //trazas para saber la posicion del jugador
+      //lcd.setCursor(0, 0);
+      //lcd.print(posicionPersonajeX);
+
+        //comprobamos si la posicion del personaje es la misma que la caja, de ser asi se terminaria el juego
+        if (contarPosicion == posicionPersonajeX){
+          // terminamos el juego
+          //limpiarmos la pantalla entera para mostrar el mensaje final
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print(" Fin del Juego");
+        lcd.setCursor(0,1);
+        lcd.print("Puntos: ");
+        lcd.print(puntuacion);//imprimimos la puntuación
+        musicaFin();//llamamos al metodo para que haga sonar la música de fin
+        guardarPuntuacion(puntuacion);
+        delay(4000);//esperamos 4 segundos y reseteamos todas las variables de inicio
+        jugadorListo = false;
+        velocidad = 500;
+        puntuacion == 0;
+        tiempo = millis();
+        lcd.clear();
+        }
+
     } else if(xVal < 500){//moverse hacia atras
       lcd.setCursor(0,1);
       lcd.print("Atras");
@@ -291,6 +329,7 @@ void loop() {
         lcd.print("Puntos: ");
         lcd.print(puntuacion);//imprimimos la puntuación
         musicaFin();//llamamos al metodo para que haga sonar la música de fin
+        guardarPuntuacion(puntuacion);
         delay(4000);//esperamos 4 segundos y reseteamos todas las variables de inicio
         jugadorListo = false;
         velocidad = 500;
@@ -319,6 +358,17 @@ void musicaFin() {
           noTone(buzzPin);
           delay(50);
     }
+  
+}
+
+void guardarPuntuacion(int puntuacion) {
+  //comprobamos la puntuacion mas alta que habia guardada, si es superior entra en el if y la actualiza.
+  int puntuacionMasAlta = EEPROM.read(0); //seteamos a esta variable la antigua puntuación guardada para luego compararla
+
+  if(puntuacion > puntuacionMasAlta){
+    EEPROM.write(0, puntuacion); //en el caso de que la nueva puntuación obtenida sea mayor a la guardada, la actualizamos en el espacio de memoria 0
+  }
+
   
 }
 
