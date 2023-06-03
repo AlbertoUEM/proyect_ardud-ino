@@ -1,5 +1,6 @@
 #include <LiquidCrystal.h> //incluimos la libreria para que funcione el lcd
 #include <EEPROM.h> //incluimos la libreria de la memoria eprom para poder guardar y leer datos en local del chip
+#include "pitches.h" //inluimos la libreria local que nos hemos descargado para la música
 
 //pines que estamos utilizando de nuestra pantalla, las conexiones
 int rs = 12;
@@ -17,6 +18,7 @@ int buzzPin = 8;
 int xVal;
 int yVal;
 int contarPosicion = 16;
+int posicionMoneda = 12; //establecemos una posicion aleatoria inicial para la moneda 
 int randomByte = 0;//caja por defecto es la 0 la de inicio
 int velocidad = 500; //velocidad inicial por defecto
 int puntuacion = 0; // Inicializamos la variable puntuacion a 0
@@ -30,6 +32,9 @@ bool jugadorListo = false;
 
 //variable para que no me imprima todo el rato el mensaje de "estas dentro Empezamos..."
 bool mensajeBienvenida = false;
+
+//variable para dibujar la moneda cuando toque
+bool monedaActiva = false;
 
 // Música de fin del juego
 int notas[] = {262, 294, 330, 349, 392, 440, 494, 523};
@@ -72,6 +77,18 @@ byte caja2[] = {
   B11011,
   B11111
 };
+//generamos la moneda que nos dará puntos extra
+byte moneda[] = {
+  B00000,
+  B01010,
+  B10101,
+  B01010,
+  B10101,
+  B01010,
+  B00000,
+  B00000
+};
+
 //dibujamos las distintas animaciones de los personajes:
 byte andar[] = {
   B01000,
@@ -135,7 +152,7 @@ void setup() {
   pinMode(buzzPin,OUTPUT);
 
   Serial.begin(9600);
-  //EEPROM.write(0,25);
+  //EEPROM.write(0,15); //resetear puntuacion guardada, cambiando el segundo numero al deseado.
 
   //generamos los obstaculos, llamandolos
   lcd.createChar(0, caja0);
@@ -145,8 +162,12 @@ void setup() {
   lcd.createChar(4, saltar);
   lcd.createChar(5, agacharse);
   lcd.createChar(6, puntos);
+  lcd.createChar(7, moneda);
   // Guardamos el tiempo de inicio
   tiempo = millis();
+
+  //en el caso de querer resetear la puntuacion guardada en la emprom, descomentamos esto, ejecutamos y lo volvemos a comentar:
+  //EEPROM.write(0, 0);
 }
 
 void loop() {
@@ -241,8 +262,28 @@ void loop() {
         lcd.print(puntuacion);
       }
       
+    //con la caja, cada 50 puntos dibuja una moneda de recompensa
+    if (puntuacion % 50 == 0) {    
+      monedaActiva = true;   //activamos la moneda
+    }
+
+    if(monedaActiva == true){
+      //generamos la moneda
+      if(posicionMoneda >=0){     
+            lcd.setCursor(posicionMoneda, 0);//vamos pintado la resta de la posicion de la caja
+            lcd.write(byte(7));//generamos una caja aleatoria, se establece aleatoriamente abajo, por defecto es la 0
+            delay(200);//va a la velocidad que se ha establecido aleatoriamente más abajo, por defecto es 500
+            lcd.clear();
+            posicionMoneda--;
+          }else{
+            posicionMoneda = 12; //vuelve a generar la posicion inicial
+            monedaActiva = false; //si llega al final la moneda y no se ha cogido la volvemos a deshabilitar
+          }
+    }
+
+
     //generamos la caja
-    if(contarPosicion >=0){
+    if(contarPosicion >=0){     
       lcd.setCursor(contarPosicion, 1);//vamos pintado la resta de la posicion de la caja
       lcd.write(byte(randomByte));//generamos una caja aleatoria, se establece aleatoriamente abajo, por defecto es la 0
       delay(velocidad);//va a la velocidad que se ha establecido aleatoriamente más abajo, por defecto es 500
@@ -266,6 +307,19 @@ void loop() {
       //trazas para saber la posicion del jugador
       //lcd.setCursor(0, 0);
       //lcd.print(posicionPersonajeX);
+      //si ha saltado y esta en la misma posicion que la moneda, lo comprobamos para sumar los puntos:
+      if (posicionMoneda == posicionPersonajeX){
+        
+        lcd.setCursor(0,0);//pintamos el mensaje, tanto en la fila 1 y 2
+        lcd.print("  Moneda BONUS");
+        lcd.setCursor(0,1);
+        lcd.print("  Obtenida! ");
+        puntuacion = puntuacion + 15; //si pilla la moneda suma 15 puntos
+        musicaBonus();//llamamos al metodo para que haga sonar la música del bonus points     
+        delay(300);//esperamos y borramos el mensaje de bonus
+        lcd.clear();
+        }
+
     } else if(yVal > 510){
       // Pintamos al muñeco agachado
       lcd.setCursor(0, 1);
@@ -298,15 +352,63 @@ void loop() {
         }
 
     } else if(xVal < 500){//moverse hacia atras
-      lcd.setCursor(0,1);
-      lcd.print("Atras");
-      delay(100);
-      lcd.clear();
+       lcd.setCursor(0, 1);
+        lcd.write(byte(3));
+        delay(100);
+        lcd.clear();
+        posicionPersonajeX = 0;
+        //trazas para saber la posicion del jugador
+        //lcd.setCursor(0, 0);
+        //lcd.print(posicionPersonajeX);
+
+          //comprobamos si la posicion del personaje es la misma que la caja, de ser asi se terminaria el juego
+          if (contarPosicion == posicionPersonajeX){
+              // terminamos el juego
+              //limpiarmos la pantalla entera para mostrar el mensaje final
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print(" Fin del Juego");
+            lcd.setCursor(0,1);
+            lcd.print("Puntos: ");
+            lcd.print(puntuacion);//imprimimos la puntuación
+            musicaFin();//llamamos al metodo para que haga sonar la música de fin
+            guardarPuntuacion(puntuacion);
+            delay(4000);//esperamos 4 segundos y reseteamos todas las variables de inicio
+            jugadorListo = false;
+            velocidad = 500;
+            puntuacion == 0;
+            tiempo = millis();
+            lcd.clear();
+          }
     } else if(xVal > 510){//moverse hacia adelante
-      lcd.setCursor(0,1);
-      lcd.print("Adelante");
-      delay(100);
-      lcd.clear();
+       lcd.setCursor(0, 1);
+        lcd.write(byte(3));
+        delay(100);
+        lcd.clear();
+        posicionPersonajeX = 0;
+        //trazas para saber la posicion del jugador
+        //lcd.setCursor(0, 0);
+        //lcd.print(posicionPersonajeX);
+
+          //comprobamos si la posicion del personaje es la misma que la caja, de ser asi se terminaria el juego
+          if (contarPosicion == posicionPersonajeX){
+              // terminamos el juego
+              //limpiarmos la pantalla entera para mostrar el mensaje final
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print(" Fin del Juego");
+            lcd.setCursor(0,1);
+            lcd.print("Puntos: ");
+            lcd.print(puntuacion);//imprimimos la puntuación
+            musicaFin();//llamamos al metodo para que haga sonar la música de fin
+            guardarPuntuacion(puntuacion);
+            delay(4000);//esperamos 4 segundos y reseteamos todas las variables de inicio
+            jugadorListo = false;
+            velocidad = 500;
+            puntuacion == 0;
+            tiempo = millis();
+            lcd.clear();
+          }
     }else{
       // Pintamos al muñeco antando
       lcd.setCursor(0, 1);
@@ -359,6 +461,43 @@ void musicaFin() {
           delay(50);
     }
   
+}
+
+//MÚSICA SOLAMENTE PARA CUANDO SEA BONUS TIME:
+void musicaBonus() {
+  int melodia[] = {
+    NOTE_B4, NOTE_B5, NOTE_FS5, NOTE_DS5,
+    NOTE_B5, NOTE_FS5, NOTE_DS5, NOTE_C5,
+    NOTE_C6, NOTE_G6, NOTE_E6, NOTE_C6, NOTE_G6, NOTE_E6,
+    
+    NOTE_B4, NOTE_B5, NOTE_FS5, NOTE_DS5, NOTE_B5,
+    NOTE_FS5, NOTE_DS5, NOTE_DS5, NOTE_E5, NOTE_F5,
+    NOTE_F5, NOTE_FS5, NOTE_G5, NOTE_G5, NOTE_GS5, NOTE_A5, NOTE_B5
+  };
+
+  int duraciones[] = {
+    16, 16, 16, 16,
+    32, 16, 8, 16,
+    16, 16, 16, 32, 16, 8,
+    
+    16, 16, 16, 16, 32,
+    16, 8, 32, 32, 32,
+    32, 32, 32, 32, 32, 16, 8
+  };
+
+ int size = sizeof(duraciones) / sizeof(int);
+
+  for (int note = 0; note < size; note++) {
+    int duration = 1000 / duraciones[note];
+    tone(buzzPin, melodia[note], duraciones);
+    
+    int pauseBetweenNotes = duration * 1.30;
+    delay(pauseBetweenNotes);
+    
+    //stop the tone playing:
+    noTone(buzzPin);
+  }
+
 }
 
 void guardarPuntuacion(int puntuacion) {
